@@ -42,12 +42,17 @@ type AccountBalances []struct {
 	Balance   string `json:"balance"`
 }
 
-
 type TradeHistory []struct {
-	Price        string `json:"price"`
-	FillFees     string `json:"fill_fees"`
-	FilledAmount string `json:"filled_amount"`
-	Side         string `json:"side"`
-	Type         string `json:"type"`
-	CreatedAt    int    `json:"created_at"`
+	ID            string `json:"id"`
+	Symbol        string `json:"symbol"`
+	Type          string `json:"type"`
+	Side          string `json:"side"`
+	Price         string `json:"price"`
+	Amount        string `json:"amount"`
+	State         string `json:"state"`
+	ExecutedValue string `json:"executed_value"`
+	FillFees      string `json:"fill_fees"`
+	FilledAmount  string `json:"filled_amount"`
+	CreatedAt     int    `json:"created_at"`
+	Source        string `json:"source"`
 }
