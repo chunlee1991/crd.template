@@ -1,9 +1,8 @@
 package fcoin
 
 import (
-	"math"
-
 	//	"strconv"
+	"math"
 	"strings"
 
 	"../../coin"
@@ -53,7 +52,6 @@ Step 7: Add Deposite Status - Bool
 Step 7: Add Confirmation - Int*/
 func (e *Fcoin) UpdateCoinConstrain() {
 	/* coinInfo := GetFcoinCoin()
-
 	//If Exchange doesn't provide constrain info, Leave blank
 	//Modify according to type and structure
 	for _, data := range coinInfo {

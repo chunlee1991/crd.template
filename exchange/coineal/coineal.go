@@ -1,10 +1,9 @@
-package fcoin
+package coineal
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 
@@ -17,7 +16,7 @@ import (
 	"../../pair"
 )
 
-type Fcoin struct {
+type Coineal struct {
 	Name         string `bson:"name"`
 	Website      string `bson:"website"`
 	RedisManager *db.RedisManager
@@ -34,7 +33,7 @@ var balanceMap cmap.ConcurrentMap
 
 // var balanceMap = make(map[*coin.Coin]float64)
 
-var instance *Fcoin
+var instance *Coineal
 var once sync.Once
 
 /***************************************************/
@@ -47,11 +46,11 @@ Execute Coins & Pairs Initial
 API_KEY: Import from Config
 API_SECRET: Import from Config
 WalletStatus: If API doesn't provide Wallet Status, import data from Postgres*/
-func CreateFcoin(config *exchange.Config) *Fcoin {
+func CreateCoineal(config *exchange.Config) *Coineal {
 	once.Do(func() {
-		instance = &Fcoin{}
-		instance.Name = "Fcoin"
-		instance.Website = "https://www.fcoin.com/"
+		instance = &Coineal{}
+		instance.Name = "Coineal"
+		instance.Website = "https://www.coineal.com/"
 
 		instance.RedisManager = db.CreateRedisManager()
 		instance.RedisServer = config.RedisServer
@@ -73,8 +72,8 @@ func CreateFcoin(config *exchange.Config) *Fcoin {
 	return instance
 }
 
-func (e *Fcoin) GetMakerDB() *db.Redis {
-	key := string(exchange.FCOIN)
+func (e *Coineal) GetMakerDB() *db.Redis {
+	key := string(exchange.COINEAL)
 	d := e.RedisManager.Get(key)
 	if d == nil {
 		d = db.CreateRedis()
@@ -92,22 +91,18 @@ Step 4: Identify Base & Target
 Step 5: Get Coin Standard Code ex. e.GetCode(base)
 Step 6: Get Coin
 Step 7: Add Pair to Exchange Pairs Arrary*/
-func (e *Fcoin) InitPairs() {
+func (e *Coineal) InitPairs() {
+	pairData := GetCoinealPair()
 
-	pairData := GetFcoinPair()
-	if pairData != nil {
-		//		fmt.Printf("pair not nil: %v ---", pairData.Data)
-		for _, symbol := range *pairData {
-			//Modify according to type and structure
-			base := coin.GetCoin(e.GetCode(symbol.QuoteCurrency))
-			target := coin.GetCoin(e.GetCode(symbol.BaseCurrency))
-			if base != nil && target != nil {
-				pair := pair.GetPair(base, target)
-				pairList = append(pairList, pair)
-			}
+	for _, data := range pairData.Data {
+		//Modify according to type and structure
+		target := coin.GetCoin(e.GetCode(data.BaseCoin))
+		base := coin.GetCoin(e.GetCode(data.CountCoin))
+		if base != nil && target != nil {
+			pair := pair.GetPair(base, target)
+			pairList = append(pairList, pair)
 		}
 	}
-
 }
 
 /*Initial the Coins of Exchange
@@ -125,21 +120,30 @@ Step 5: if the coin doesn't exist in coinmap, Add the coin in coinmap
 	- Blockheigh: the heigh of the chain
 	- Blocktime: the time of the block created
 	- Blocklast: the last block of the chain*/
-func (e *Fcoin) InitCoins() {
-	coinInfo := GetFcoinCoin()
-
-	if coinInfo != nil {
-		for _, data := range coinInfo {
-			//Modify according to type and structure
-			c := coin.GetCoin(e.GetCode(data))
-			if c == nil {
-				c = &coin.Coin{}
-				c.Code = e.GetCode(data)
-				//				c.Name = data.FullName
-				coin.AddCoin(c)
-			}
-			coinList = append(coinList, c)
+func (e *Coineal) InitCoins() {
+	coinInfo := GetCoinealCoins()
+	coinMap := make(map[string]*coin.Coin)
+	for _, data := range coinInfo.Data {
+		//Modify according to type and structure
+		c := coin.GetCoin(e.GetCode(data.CountCoin))
+		if c == nil {
+			c = &coin.Coin{}
+			c.Code = e.GetCode(data.CountCoin)
+			coin.AddCoin(c)
 		}
+		//coinList = append(coinList, c)
+		coinMap[c.Code] = c
+		c = coin.GetCoin(e.GetCode(data.BaseCoin))
+		if c == nil {
+			c = &coin.Coin{}
+			c.Code = e.GetCode(data.BaseCoin)
+			coin.AddCoin(c)
+		}
+		//coinList = append(coinList, c)
+		coinMap[c.Code] = c
+	}
+	for _, eachCoin := range coinMap {
+		coinList = append(coinList, eachCoin)
 	}
 }
 
@@ -147,12 +151,12 @@ func (e *Fcoin) InitCoins() {
 /*Upload updated Maker to Redis
 Step 1: Change Instance Name (e *<exchange Instance Name>)
 Step 2: Change Exchange Name exchange.<Capital Letter Exchange Name>*/
-func (e *Fcoin) UpdateMaker(pair *pair.Pair, maker *market.Maker) error {
+func (e *Coineal) UpdateMaker(pair *pair.Pair, maker *market.Maker) error {
 	m, err := json.Marshal(maker)
 	if err != nil {
 		return err
 	}
-	key := fmt.Sprintf("%s-%s", exchange.FCOIN, pair.Name)
+	key := fmt.Sprintf("%s-%s", exchange.COINEAL, pair.Name)
 	return e.GetMakerDB().Set(key, string(m))
 }
 
@@ -160,11 +164,11 @@ func (e *Fcoin) UpdateMaker(pair *pair.Pair, maker *market.Maker) error {
 Step 1: Change Instance Name    (e *<exchange Instance Name>)
 Step 2: Change Exchange Name    exchange.<Capital Letter Exchange Name>
 Step 3: Change Error Exchange Name    <exchange Name> does not have the pair*/
-func (e *Fcoin) GetMaker(pair *pair.Pair) (maker *market.Maker, err error) {
-	key := fmt.Sprintf("%s-%s", exchange.FCOIN, pair.Name)
+func (e *Coineal) GetMaker(pair *pair.Pair) (maker *market.Maker, err error) {
+	key := fmt.Sprintf("%s-%s", exchange.COINEAL, pair.Name)
 	val, err := e.GetMakerDB().Get(key)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Fcoin does not have the pair : %v", pair.Name))
+		return nil, errors.New(fmt.Sprintf("Coineal does not have the pair : %v", pair.Name))
 	}
 	if str, ok := val.(string); ok {
 
@@ -172,42 +176,42 @@ func (e *Fcoin) GetMaker(pair *pair.Pair) (maker *market.Maker, err error) {
 			return nil, err
 		}
 	} else {
-		return nil, errors.New(fmt.Sprintf("Fcoin GetMaker Key: %v can't convert to string: %v", key, val))
+		return nil, errors.New(fmt.Sprintf("Coineal GetMaker Key: %v can't convert to string: %v", key, val))
 	}
 	return maker, err
 }
 
 /***************************************************/
-func (e *Fcoin) SetCoins() error {
+func (e *Coineal) SetCoins() error {
 	return nil
 }
 
-func (e *Fcoin) GetCoins() []*coin.Coin {
+func (e *Coineal) GetCoins() []*coin.Coin {
 	return coinList
 }
 
-func (e *Fcoin) SetPairs() error {
+func (e *Coineal) SetPairs() error {
 	return nil
 }
 
 /*Get Exchange All Pairs
 Step 1: Change Instance Name    (e *<exchange Instance Name>)*/
-func (e *Fcoin) GetPairs() []*pair.Pair {
+func (e *Coineal) GetPairs() []*pair.Pair {
 	return pairList
 }
 
 /*Get Pair Code base on Exchange
 Step 1: Change Instance Name    (e *<exchange Instance Name>)
 Step 2: Change Format of Code   ex. ADABTC in Binance, eos_btc in TradeSatoshi*/
-func (e *Fcoin) GetPairCode(pair *pair.Pair) string {
+func (e *Coineal) GetPairCode(pair *pair.Pair) string {
 	//Modify according to Exchange Request
-	code := fmt.Sprintf("%s%s", strings.ToUpper(e.GetSymbol(pair.Target.Code)), strings.ToUpper(e.GetSymbol(pair.Base.Code)))
+	code := fmt.Sprintf("%s%s", strings.ToLower(e.GetSymbol(pair.Target.Code)), strings.ToLower(e.GetSymbol(pair.Base.Code)))
 	return code
 }
 
 /*Check the exchange has the pair
 Step 1: Change Instance Name    (e *<exchange Instance Name>)*/
-func (e *Fcoin) HasPair(pair *pair.Pair) bool {
+func (e *Coineal) HasPair(pair *pair.Pair) bool {
 	m, err := e.GetMaker(pair)
 	if err == nil && m != nil && m.Bids != nil {
 		return true
@@ -219,15 +223,15 @@ func (e *Fcoin) HasPair(pair *pair.Pair) bool {
 /*Get Exchange Name
 Step 1: Change Instance Name    (e *<exchange Instance Name>)
 Step 2: Change Exchange Name    exchange.<Capital Letter Exchange Name>*/
-func (e *Fcoin) GetName() exchange.ExchangeName {
-	return exchange.FCOIN
+func (e *Coineal) GetName() exchange.ExchangeName {
+	return exchange.COINEAL
 }
 
 /*Get Exchange Taker Fee
 Step 1: Change Instance Name    (e *<exchange Instance Name>)
 Step 2: Change Return base on the taker fee that exchange provides*/
-func (e *Fcoin) GetFee(pair *pair.Pair) float64 { // Taker fee for each coin
-	return 0.002 //Taker Fee: 0.2%
+func (e *Coineal) GetFee(pair *pair.Pair) float64 { // Taker fee for each coin
+	return 0.0015 //Taker Fee: 0.15%
 }
 
 /*Get Pair LotSize(Quantity)
@@ -240,24 +244,8 @@ Step 2:
 		return constrain.lotSize
 	Condition 2: API doesn't provides this information
 		return Minimum value*/
-func (e *Fcoin) GetLotSize(pair *pair.Pair) float64 {
-	key := fmt.Sprintf("%s-Constrain-%s", exchange.FCOIN, pair.Name)
-	val, err := e.GetMakerDB().Get(key)
-	if err != nil {
-		log.Printf("Fcoin GetLotSize Key: %v Err: %s\n", key, err)
-		return 0.00000001
-	}
-	constrain := exchange.PairConstrain{}
-	if str, ok := val.(string); ok {
-		if err := json.Unmarshal([]byte(str), &constrain); err != nil {
-			log.Printf("Fcoin GetLotSize Key: %v Unmarshal Err: %s\n", key, err)
-			return 0.00000001
-		}
-	} else {
-		log.Printf("Fcoin GetLotSize Key: %v can't convert to string: %v", key, val)
-		return 0.00000001
-	}
-	return constrain.LotSize
+func (e *Coineal) GetLotSize(pair *pair.Pair) float64 {
+	return 0.00000001
 }
 
 /*Get Pair PriceFilter(Price)
@@ -270,32 +258,15 @@ Step 2:
 		return constrain.tickSize
 	Condition 2: API doesn't provides this information
 		return Minimum value*/
-func (e *Fcoin) GetPriceFilter(pair *pair.Pair) float64 { // tickSize for price
-	key := fmt.Sprintf("%s-Constrain-%s", exchange.FCOIN, pair.Name)
-	val, err := e.GetMakerDB().Get(key)
-	if err != nil {
-		log.Printf("Fcoin GetPriceFilter Key: %v Err: %s\n", key, err)
-		return 0.00000001
-	}
-	constrain := exchange.PairConstrain{}
-	if str, ok := val.(string); ok {
-		if err := json.Unmarshal([]byte(str), &constrain); err != nil {
-			log.Printf("Fcoin GetPriceFilter Key: %v Unmarshal Err: %s\n", key, err)
-			return 0.00000001
-		}
-	} else {
-		log.Printf("Fcoin GetPriceFilter Key: %v can't convert to string: %v", key, val)
-		return 0.00000001
-	}
-	return constrain.TickSize
-	//	return 0.00000001
+func (e *Coineal) GetPriceFilter(pair *pair.Pair) float64 { // tickSize for price
+	return 0.00000001
 }
 
-func (e *Fcoin) GetConstrainFetchMethod(pair *pair.Pair) *exchange.ConstrainFetchMethod {
+func (e *Coineal) GetConstrainFetchMethod(pair *pair.Pair) *exchange.ConstrainFetchMethod {
 	constrainFetchMethod := &exchange.ConstrainFetchMethod{}
-	constrainFetchMethod.Fee = true
-	constrainFetchMethod.LotSize = true
-	constrainFetchMethod.TickSize = true
+	constrainFetchMethod.Fee = false
+	constrainFetchMethod.LotSize = false
+	constrainFetchMethod.TickSize = false
 	constrainFetchMethod.TxFee = false
 	constrainFetchMethod.Withdraw = false
 	constrainFetchMethod.Deposit = false
@@ -306,7 +277,7 @@ func (e *Fcoin) GetConstrainFetchMethod(pair *pair.Pair) *exchange.ConstrainFetc
 /*************** coins on the exchanges ***************/
 /*Get Coin Balance
 Step 1: Change Instance Name    (e *<exchange Instance Name>)*/
-func (e *Fcoin) GetBalance(coin *coin.Coin) float64 {
+func (e *Coineal) GetBalance(coin *coin.Coin) float64 {
 	if tmp, ok := balanceMap.Get(coin.Code); ok {
 		return tmp.(float64)
 	} else {
@@ -324,24 +295,8 @@ Step 2:
 		return constrain.TxFee
 	Condition 2: API doesn't provides this information
 		return Minimum value*/
-func (e *Fcoin) GetTxFee(coin *coin.Coin) float64 { // Withdraw Fee
-	key := fmt.Sprintf("%s-Constrain-%s", exchange.FCOIN, coin.Code)
-	val, err := e.GetMakerDB().Get(key)
-	if err != nil {
-		log.Printf("Fcoin GetTxFee Key: %v Err: %s\n", key, err)
-		return 100.001
-	}
-	constrain := exchange.CoinConstrain{}
-	if str, ok := val.(string); ok {
-		if err := json.Unmarshal([]byte(str), &constrain); err != nil {
-			log.Printf("Fcoin GetTxFee Key: %v Unmarshal Err: %s\n", key, err)
-			return 100.001
-		}
-	} else {
-		log.Printf("Fcoin GetConfirmaGetTxFeetion Key: %v can't convert to string: %v", key, val)
-		return 100.001
-	}
-	return constrain.TxFee
+func (e *Coineal) GetTxFee(coin *coin.Coin) float64 { // Withdraw Fee
+	return 0.0001
 }
 
 /*Get Coin Confirmation
@@ -354,24 +309,8 @@ Step 2:
 		return constrain.Confirmation
 	Condition 2: API doesn't provides this information
 		return 0*/
-func (e *Fcoin) GetConfirmation(coin *coin.Coin) int { // deposit confirmations
-	key := fmt.Sprintf("%s-Constrain-%s", exchange.CRYPTOPIA, coin.Code)
-	val, err := e.GetMakerDB().Get(key)
-	if err != nil {
-		log.Printf("Fcoin GetConfirmation Key: %v Err: %s\n", key, err)
-		return 1001
-	}
-	constrain := exchange.CoinConstrain{}
-	if str, ok := val.(string); ok {
-		if err := json.Unmarshal([]byte(str), &constrain); err != nil {
-			log.Printf("Fcoin GetConfirmation Key: %v Unmarshal Err: %s\n", key, err)
-			return 1001
-		}
-	} else {
-		log.Printf("Fcoin GetConfirmation Key: %v can't convert to string: %v", key, val)
-		return 1001
-	}
-	return constrain.Confirmation
+func (e *Coineal) GetConfirmation(coin *coin.Coin) int { // deposit confirmations
+	return 0
 }
 
 /*Check Coin Withdraw Enable
@@ -386,7 +325,7 @@ Step 2:
 		Manually write to Postgres
 		When Initial Exchange, read postgres data to be constrain
 		-- Detail Ask Chun --*/
-func (e *Fcoin) CanWithdraw(coin *coin.Coin) bool { // does withdraw enable
+func (e *Coineal) CanWithdraw(coin *coin.Coin) bool { // does withdraw enable
 	return true
 }
 
@@ -402,7 +341,7 @@ Step 2:
 		Manually write to Postgres
 		When Initial Exchange, read postgres data to be constrain
 		-- Detail Ask Chun --*/
-func (e *Fcoin) CanDeposit(coin *coin.Coin) bool { // does deposit enable
+func (e *Coineal) CanDeposit(coin *coin.Coin) bool { // does deposit enable
 	return true
 }
 
@@ -410,6 +349,6 @@ func (e *Fcoin) CanDeposit(coin *coin.Coin) bool { // does deposit enable
 Step 1: Find the website's Exchange page, copy it's URL
 Step 2: Change the pair's syntax to match the URL syntax
 */
-func (e *Fcoin) GetTradingWebURL(pair *pair.Pair) string {
-	return fmt.Sprintf("https://exchange.fcoin.com/ex/spot/main/%s/%s", strings.ToLower(pair.Target.Code), strings.ToLower(pair.Base.Code))
+func (e *Coineal) GetTradingWebURL(pair *pair.Pair) string {
+	return fmt.Sprintf("https://www.coineal.com/trade_center.html#en_US")
 }

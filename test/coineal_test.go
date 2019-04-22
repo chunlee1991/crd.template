@@ -6,14 +6,14 @@ import (
 
 	"../coin"
 	"../exchange"
-	"../exchange/fcoin"
+	"../exchange/coineal"
 	"../pair"
 	"github.com/davecgh/go-spew/spew"
 )
 
 /********************API********************/
-func Test_Fcoin_Balance(t *testing.T) {
-	e := initFcoin()
+func Test_Coineal_Balance(t *testing.T) {
+	e := initCoineal()
 	e.UpdateAllBalances()
 
 	for k, v := range e.GetPairs() { // pairs from binance
@@ -25,56 +25,53 @@ func Test_Fcoin_Balance(t *testing.T) {
 	}
 }
 
-func Test_Fcoin_Withdraw(t *testing.T) {
-	e := initFcoin()
+func Test_Coineal_Withdraw(t *testing.T) {
+	e := initCoineal()
 	c := coin.GetCoin("BTC")
 	amount := 0.0
 	addr := "Address"
 	tag := ""
 	if e.Withdraw(c, amount, addr, tag) {
-		log.Printf("Fcoin %s Withdraw Successful!", c.Code)
+		log.Printf("Coineal %s Withdraw Successful!", c.Code)
 	}
 }
 
-// no blance, cannot test this 
-func Test_Fcoin_Trade(t *testing.T) {
-	e := initFcoin()
-	p := pair.GetPair(coin.GetCoin("BTC"), coin.GetCoin("ETH"))
-
-	rate := 0.00001
+func Test_Coineal_Trade(t *testing.T) {
+	e := initCoineal()
+	p := pair.GetPair(coin.GetCoin("BTC"), coin.GetCoin("ZCL"))
+	rate := 0.000001
 	quantity := 1.0
 
 	order, err := e.LimitBuy(p, quantity, rate)
 	if err == nil {
-		log.Printf("Fcoin Limit Buy: %v", order)
+		log.Printf("Coineal Limit Buy: %v", order)
 	} else {
-		log.Printf("Fcoin Limit Buy Err: %s", err)
+		log.Printf("Coineal Limit Buy Err: %s", err)
 	}
 
 	err = e.OrderStatus(order)
 	if err == nil {
-		log.Printf("Fcoin Order Status: %v", order)
+		log.Printf("Coineal Order Status: %v", order)
 	} else {
-		log.Printf("Fcoin Order Status Err: %s", err)
+		log.Printf("Coineal Order Status Err: %s", err)
 	}
 
 	err = e.CancelOrder(order)
 	if err == nil {
-		log.Printf("Fcoin Cancel Order: %v", order)
+		log.Printf("Coineal Cancel Order: %v", order)
 	} else {
-		log.Printf("Fcoin Cancel Err: %s", err)
+		log.Printf("Coineal Cancel Err: %s", err)
 	}
 }
 
-func Test_Fcoin_OrderBook(t *testing.T) {
-	e := initFcoin()
+func Test_Coineal_OrderBook(t *testing.T) {
+	e := initCoineal()
 
 	for _, pair := range e.GetPairs() { // pairs from binance
 		if pair != nil {
 			orderbook, err := e.OrderBook(pair)
 			if err == nil {
 				log.Printf("%s: %+v", pair.Name, orderbook)
-				//log.Printf("%s: ", pair.Name)
 			}
 		}
 
@@ -82,8 +79,8 @@ func Test_Fcoin_OrderBook(t *testing.T) {
 }
 
 /********************General********************/
-func Test_Fcoin_ConstrainFetch(t *testing.T) {
-	e := initFcoin()
+func Test_Coineal_ConstrainFetch(t *testing.T) {
+	e := initCoineal()
 
 	p := pair.GetPair(coin.GetCoin("BTC"), coin.GetCoin("BCH"))
 
@@ -92,8 +89,8 @@ func Test_Fcoin_ConstrainFetch(t *testing.T) {
 	spew.Dump(status)
 }
 
-func Test_Fcoin_Constrain(t *testing.T) {
-	e := initFcoin()
+func Test_Coineal_Constrain(t *testing.T) {
+	e := initCoineal()
 
 	pair := pair.GetPairByKey("BTC|ETH")
 	coinName := coin.GetCoin(pair.Target.Code)
@@ -105,8 +102,8 @@ func Test_Fcoin_Constrain(t *testing.T) {
 	log.Printf("Deposit: %v", e.CanDeposit(coinName))
 }
 
-func Test_Fcoin_GetMaker(t *testing.T) {
-	e := initFcoin()
+func Test_Coineal_GetMaker(t *testing.T) {
+	e := initCoineal()
 
 	pair := pair.GetPairByKey("BTC|ETH")
 	maker, _ := e.GetMaker(pair)
@@ -119,15 +116,14 @@ Redis Server: xx.xx.xx.xx:xxxx
 Redis DB: DB Number
 API Key: Exchange API Key
 API Secret: Exchange API Secret Key */
-
-func initFcoin() exchange.Exchange {
+func initCoineal() exchange.Exchange {
 	pair.Init()
 	config := &exchange.Config{}
 	config.RedisServer = "RedisAddr:Port"
 	config.RedisDB = 0
-	config.API_KEY = "7eb8721a8fb341718035abc2335d8545"
-	config.API_SECRET = "523d79a231ed44a981e1056151861b09"
-	ex := fcoin.CreateFcoin(config)
+	config.API_KEY = ""
+	config.API_SECRET = ""
+	ex := coineal.CreateCoineal(config)
 	log.Printf("Initial [ %v ]", ex.GetName())
 	config = nil
 	return ex

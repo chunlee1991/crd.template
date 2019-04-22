@@ -11,9 +11,8 @@ type JsonResponse struct {
 	Message string          `json:"msg"`
 }
 
-type CoinsData struct {
-	Status int      `json:"status"`
-	Data   []string `json:"data"`
+type CoinsData []struct {
+	Data string `json:"data"`
 }
 
 type PairsData []struct {
@@ -23,7 +22,6 @@ type PairsData []struct {
 	PriceDecimal  int    `json:"price_decimal"`
 	AmountDecimal int    `json:"amount_decimal"`
 }
-
 type OrderBook struct {
 	Bids []float64 `json:"bids"`
 	Asks []float64 `json:"asks"`
@@ -43,6 +41,7 @@ type AccountBalances []struct {
 	Frozen    string `json:"frozen"`
 	Balance   string `json:"balance"`
 }
+
 
 type TradeHistory []struct {
 	Price        string `json:"price"`
